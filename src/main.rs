@@ -67,7 +67,7 @@ fn construct_output(config: Config, json: Value) -> Result<String> {
     };
 
     let mut output: String = format!(
-        "♫ My Top {} played artists in the past{}:",
+        "♫ My Top {} played artists in the past{} via #LastFM ♫:\n",
         config.limit.to_string(),
         period
     );
@@ -93,7 +93,7 @@ fn construct_output(config: Config, json: Value) -> Result<String> {
         output = format!(" {} {} ({}){}", output, name, playcount, ending);
     }
 
-    Ok(format!("{}. Via #LastFM ♫", output))
+    Ok(format!("{}.", output))
 }
 
 fn main() -> Result<()> {
