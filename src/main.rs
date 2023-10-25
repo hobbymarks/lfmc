@@ -100,8 +100,11 @@ fn main() -> Result<()> {
     if let Some(home_dir) = dirs::home_dir() {
         dotenv::from_filename(format!("{}/.config/lfmc/.env", home_dir.to_string_lossy())).ok();
     }
+
     let args = Args::parse();
+
     let config = Config::new(args.api_key, args.username, args.limit, args.period);
+
     let resp: Result<_, reqwest::Error> = reqwest::blocking::get(config.get_uri())?.json::<Value>();
 
     if let Ok(json) = resp {
