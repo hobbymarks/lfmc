@@ -55,6 +55,37 @@ impl Config {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::Config;
+
+    #[test]
+    fn test_config() {
+        let api_key = "api_key";
+        let username = "username";
+        let limit = 5;
+        let period = "7day";
+
+        let config = Config::new(
+            String::from(api_key),
+            String::from(username),
+            limit,
+            String::from(period),
+        );
+
+        let uri = config.get_uri();
+        let keys = [
+            format!("user={}", username),
+            format!("api_key={}", api_key),
+            format!("limit={}", limit),
+            format!("period={}", period),
+        ];
+        for pat in keys.iter() {
+            assert!(uri.find(pat).is_some());
+        }
+    }
+}
+
 fn construct_output(config: Config, json: Value) -> Result<String> {
     let period: &str = match config.period.as_str() {
         "overall" => "",
