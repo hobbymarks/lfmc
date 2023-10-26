@@ -13,3 +13,5 @@ Cargo.lock
 *.pdb
 
 .env
+
+lcov.info
