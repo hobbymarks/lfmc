@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use dotenv;
-use log::info;
+use log::{error, info};
 use reqwest;
 use serde_json::Value;
 
@@ -104,12 +104,19 @@ fn construct_output(config: Config, json: Value) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
+    use log::info;
     use serde_json::Value;
 
     use crate::{construct_output, Config};
 
+    fn init() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    }
+
     #[test]
     fn test_config() {
+        init();
+
         let api_key = "api_key";
         let username = "username";
         let limit = 5;
@@ -123,6 +130,8 @@ mod tests {
         );
 
         let uri = config.get_uri();
+        info!("uri={}", uri);
+
         let keys = [
             format!("user={}", username),
             format!("api_key={}", api_key),
@@ -134,42 +143,48 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_construct_output() {
-    //     let api_key = "api_key";
-    //     let username = "username";
-    //     let limit = 5;
-    //     let period = "7day";
+    #[test]
+    fn test_construct_output() {
+        init();
 
-    //     let config = Config::new(
-    //         String::from(api_key),
-    //         String::from(username),
-    //         limit,
-    //         String::from(period),
-    //     );
+        let api_key = "api_key";
+        let username = "username";
+        let limit = 5;
+        let period = "7day";
 
-    //     let artist = r#"
-    //     {
-    //         "topartists":{
-    //             "artist":["Fia","Sea","Tha","Foa","Fia"]}
-    //     }
-    //     "#;
+        let config = Config::new(
+            String::from(api_key),
+            String::from(username),
+            limit,
+            String::from(period),
+        );
 
-    //     let parsed_json: Result<Value, serde_json::Error> = serde_json::from_str(artist);
+        let artist = r#"
+        {
+            "topartists":{
+                "artist":["Fia","Sea","Tha","Foa","Fia"]}
+        }
+        "#;
 
-    //     if let Ok(json) = parsed_json {
-    //         let output: Result<String, anyhow::Error> = construct_output(config, json);
-    //         if let Ok(output_string) = output {
-    //             let key = "Fia";
-    //             assert!(output_string.find(key).is_some());
-    //         }
-    //     }
-    // }
+        let parsed_json: Result<Value, serde_json::Error> = serde_json::from_str(artist);
+
+        if let Ok(json) = parsed_json {
+            let output: Result<String, anyhow::Error> = construct_output(config, json);
+            if let Ok(output_string) = output {
+                let key = "Fia";
+                assert!(output_string.find(key).is_some());
+            }
+        }
+    }
 }
 
 fn main() -> Result<()> {
-    env_logger::init();
-    info!("main running ...");
+    env_logger::Builder::from_default_env()
+        .format_timestamp_millis()
+        .format_module_path(true)
+        .init();
+
+    info!(" main running ... ");
 
     if let Some(home_dir) = dirs::home_dir() {
         info!("Loading env ...");
@@ -189,6 +204,7 @@ fn main() -> Result<()> {
         let output = construct_output(config, json)?;
         println!("\n{}\n", output);
     } else {
+        error!("Could not convert response to JSON.");
         return Err(anyhow!("Could not convert response to JSON."));
     }
 
