@@ -4,6 +4,7 @@ use dotenv;
 use log::{error, info};
 use reqwest;
 use serde_json::Value;
+use std::io::Write;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -179,9 +180,19 @@ mod tests {
 }
 
 fn main() -> Result<()> {
-    env_logger::Builder::from_default_env()
-        .format_timestamp_millis()
-        .format_module_path(true)
+    env_logger::Builder::new()
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "{} [{}]{}:{} {}",
+                chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                record.level(),
+                record.file().unwrap_or("unknown"),
+                record.line().unwrap_or(0),
+                record.args()
+            )
+        })
+        .filter(None, log::LevelFilter::Info)
         .init();
 
     info!(" main running ... ");
