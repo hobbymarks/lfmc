@@ -2,10 +2,11 @@ use anyhow::{anyhow, Result};
 use chrono::Local;
 use clap::Parser;
 use dotenv;
-use log::{error, info};
+use fern::{log_file, Dispatch};
+use log::{debug, error, trace, LevelFilter};
 use reqwest;
 use serde_json::Value;
-use std::{fs::File, io::Write};
+use std::io::stdout;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -68,21 +69,21 @@ fn construct_output(config: Config, json: Value) -> Result<String> {
         "12month" => " year",
         _ => return Err(anyhow!("Period {} not allowed. Only allow \"overall\", \"7day\", \"1month\", \"3month\", \"6month\", or \"12month\".", config.period))
     };
-    info!("period={}", period);
+    trace!("period={}", period);
 
     let mut output: String = format!(
         "♫ My Top {} played artists in the past{} via #LastFM ♫:\n",
         config.limit.to_string(),
         period
     );
-    info!("output={}", output);
+    trace!("output={}", output);
 
     let artists = json["topartists"]["artist"]
         .as_array()
         .ok_or(anyhow!("Error parsing JSON."))?;
 
     for (i, artist) in artists.iter().enumerate() {
-        info!("i={},artist={}", i, artist);
+        trace!("i={},artist={}", i, artist);
         let ending = match i {
             x if x <= (config.limit as usize - 3) => ",",
             x if x == (config.limit as usize - 2) => ", &",
@@ -97,28 +98,20 @@ fn construct_output(config: Config, json: Value) -> Result<String> {
             .ok_or(anyhow!("Playcount not found."))?;
 
         output = format!(" {} {} ({}){}", output, name, playcount, ending);
-        info!("output={}", output);
+        trace!("output={}", output);
     }
 
-    info!("output={}", output);
+    trace!("output={}", output);
     Ok(format!("{}.", output))
 }
 
 #[cfg(test)]
 mod tests {
-    use log::info;
     use serde_json::Value;
 
     use crate::{construct_output, Config};
-
-    fn init() {
-        let _ = env_logger::builder().is_test(true).try_init();
-    }
-
     #[test]
     fn test_config() {
-        init();
-
         let api_key = "api_key";
         let username = "username";
         let limit = 5;
@@ -132,7 +125,6 @@ mod tests {
         );
 
         let uri = config.get_uri();
-        info!("uri={}", uri);
 
         let keys = [
             format!("user={}", username),
@@ -147,8 +139,6 @@ mod tests {
 
     #[test]
     fn test_construct_output() {
-        init();
-
         let api_key = "api_key";
         let username = "username";
         let limit = 5;
@@ -181,42 +171,57 @@ mod tests {
 }
 
 fn main() -> Result<()> {
-    let target = Box::new(File::create("lfmc.log").expect("Can't create file"));
-
-    env_logger::Builder::new()
-        .target(env_logger::Target::Pipe(target))
-        .format(|buf, record| {
-            let level_style = buf.default_level_style(record.level());
-            writeln!(
-                buf,
-                "{} [{}] {}:{} {}",
+    let file_config = Dispatch::new()
+        .format(move |out, message, record| {
+            out.finish(format_args!(
+                "{} [ {} ] {}:{} {}",
                 Local::now().format("%Y-%m-%dT%H:%M:%S.%3f"),
-                level_style.value(record.level()),
+                record.level(),
                 record.file().unwrap_or("unknown"),
                 record.line().unwrap_or(0),
-                record.args()
-            )
+                message
+            ))
         })
-        .filter(None, log::LevelFilter::Info)
-        .init();
+        .level(LevelFilter::Trace)
+        .chain(log_file("lfmc.log")?);
 
-    info!(" main running ... ");
+    let console_config = Dispatch::new()
+        .format(move |out, message, record| {
+            out.finish(format_args!(
+                "{} [ {} ] {}:{} {}",
+                Local::now().format("%Y-%m-%dT%H:%M:%S.%3f"),
+                record.level(),
+                record.file().unwrap_or("unknown"),
+                record.line().unwrap_or(0),
+                message
+            ))
+        })
+        .level(LevelFilter::Warn)
+        // .chain(fern::log_file("lfmc.log").unwrap())
+        .chain(stdout());
+
+    Dispatch::new()
+        .chain(file_config)
+        .chain(console_config)
+        .apply()?;
+
+    debug!(" main running ... ");
 
     if let Some(home_dir) = dirs::home_dir() {
-        info!("Loading env ...");
+        debug!("Loading env ...");
         dotenv::from_filename(format!("{}/.config/lfmc/.env", home_dir.to_string_lossy())).ok();
     }
 
-    info!("Parsing args ...");
+    debug!("Parsing args ...");
     let args = Args::parse();
 
-    info!("Creating config ...");
+    debug!("Creating config ...");
     let config = Config::new(args.api_key, args.username, args.limit, args.period);
 
     let resp: Result<_, reqwest::Error> = reqwest::blocking::get(config.get_uri())?.json::<Value>();
 
     if let Ok(json) = resp {
-        info!("Constructing output ...");
+        debug!("Constructing output ...");
         let output = construct_output(config, json)?;
         println!("\n{}\n", output);
     } else {
@@ -224,6 +229,6 @@ fn main() -> Result<()> {
         return Err(anyhow!("Could not convert response to JSON."));
     }
 
-    info!("main finished.");
+    debug!("main finished.");
     Ok(())
 }
