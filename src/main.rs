@@ -171,7 +171,7 @@ mod tests {
 }
 
 fn main() -> Result<()> {
-    let file_config = Dispatch::new()
+    let file_log_config = Dispatch::new()
         .format(move |out, message, record| {
             out.finish(format_args!(
                 "{} [ {} ] {}:{} {}",
@@ -185,7 +185,7 @@ fn main() -> Result<()> {
         .level(LevelFilter::Trace)
         .chain(log_file("lfmc.log")?);
 
-    let console_config = Dispatch::new()
+    let stdout_log_config = Dispatch::new()
         .format(move |out, message, record| {
             out.finish(format_args!(
                 "{} [ {} ] {}:{} {}",
@@ -201,15 +201,16 @@ fn main() -> Result<()> {
         .chain(stdout());
 
     Dispatch::new()
-        .chain(file_config)
-        .chain(console_config)
+        .chain(file_log_config)
+        .chain(stdout_log_config)
         .apply()?;
 
-    debug!(" main running ... ");
+    debug!("main running ... ");
 
     if let Some(home_dir) = dirs::home_dir() {
-        debug!("Loading env ...");
-        dotenv::from_filename(format!("{}/.config/lfmc/.env", home_dir.to_string_lossy())).ok();
+        let env_file_string = format!("{}/.config/lfmc/.env", home_dir.to_string_lossy());
+        debug!("Loading env from {} ...", env_file_string);
+        dotenv::from_filename(env_file_string).ok();
     }
 
     debug!("Parsing args ...");
