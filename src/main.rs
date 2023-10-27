@@ -1,10 +1,11 @@
 use anyhow::{anyhow, Result};
+use chrono::Local;
 use clap::Parser;
 use dotenv;
 use log::{error, info};
 use reqwest;
 use serde_json::Value;
-use std::io::Write;
+use std::{fs::File, io::Write};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -180,13 +181,17 @@ mod tests {
 }
 
 fn main() -> Result<()> {
+    let target = Box::new(File::create("lfmc.log").expect("Can't create file"));
+
     env_logger::Builder::new()
+        .target(env_logger::Target::Pipe(target))
         .format(|buf, record| {
+            let level_style = buf.default_level_style(record.level());
             writeln!(
                 buf,
-                "{} [{}]{}:{} {}",
-                chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
-                record.level(),
+                "{} [{}] {}:{} {}",
+                Local::now().format("%Y-%m-%dT%H:%M:%S.%3f"),
+                level_style.value(record.level()),
                 record.file().unwrap_or("unknown"),
                 record.line().unwrap_or(0),
                 record.args()
